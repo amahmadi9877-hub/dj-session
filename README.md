@@ -10,11 +10,12 @@ Your job is to make it work again.
 
 ## Before You Start
 
-Create a virtual environment and install the dependencies.
+Create a virtual environment.
 
 ```bash
-pip install -r requirements.txt
+python -m venv .venv
 ```
+
 
 Run database migrations.
 
