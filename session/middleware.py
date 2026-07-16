@@ -1,31 +1,48 @@
+import time
 from django.utils.deprecation import MiddlewareMixin
-from django.shortcuts import redirect
-from django.utils import timezone
-from session.models import Session
-
-SESSION_KEY = "_auth_user_id"
-BACKEND_SESSION_KEY = "_auth_user_backend"
-HASH_SESSION_KEY = "_auth_user_hash"
-REDIRECT_FIELD_NAME = "next"
+from session.sessionstore import SessionStore
+from django.utils.http import http_date
+from django.contrib.sessions.backends.base import UpdateError
+from django.contrib.sessions.exceptions import SessionInterrupted
 
 
 class SessionMiddleware(MiddlewareMixin):
-    def process_request(self, request):
-        request.session = Session()
-        session_id = request.COOKIES.get("session_id")
-        if (
-            session_id
-            and not request.path == "/register/"
-            and not request.path == "/login/"
-        ):
-            try:
-                request.session = Session.objects.get(session_id=session_id)
-                if request.session.expire_date < timezone.now():
-                    return redirect("login")
-                request.user = request.session.user_id
-            except Session.DoesNotExist:
-                return redirect("login")
+    def __init__(self, get_response):
+        super().__init__(get_response)
+        self.SessionStore = SessionStore
 
-    # def process_response(self, request, response):
-    #     if request.path == "/login/":
-    #         session = Session.objects.create
+    def process_request(self, request):
+        session_key = request.COOKIES.get("session_key")
+        request.session = self.SessionStore(session_key)
+
+    def process_response(self, request, response):
+        try:
+            empty = request.session.is_empty()
+        except AttributeError:
+            return response
+        if "session_key" in request.COOKIES and empty:
+            response.delete_cookie("session_key")
+        else:
+            if not empty:
+                max_age = request.session.get_expiry_age()
+                expires_time = time.time() + max_age
+                expires = http_date(expires_time)
+                if response.status_code < 500:
+                    try:
+                        request.session.save()
+                    except UpdateError:
+                        raise SessionInterrupted(
+                            "The request's session was deleted before the "
+                            "request completed. The user may have logged "
+                            "out in a concurrent request, for example."
+                        )
+                    response.set_cookie(
+                        "session_key",
+                        request.session._session_key,
+                        max_age=max_age,
+                        expires=expires,
+                    )
+
+                    # "https://youtube.com/@ramin-s?si=NC9LTub6LoVYLLc2"
+
+        return response
