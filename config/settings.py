@@ -39,10 +39,10 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "session.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "config.middleware.AuthenticationMiddleware",
-    "session.middleware.SessionMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
